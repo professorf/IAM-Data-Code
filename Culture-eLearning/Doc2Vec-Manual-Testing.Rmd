@@ -1,0 +1,41 @@
+---
+title: "Doc2Vec Test Data"
+output: html_notebook
+---
+
+```{r}
+library(doc2vec)
+library(lsa)
+```
+
+1.
+```{r}
+doc_ids = c("fox", "men", "panama")
+texts = c("the quick brown fox jumped over the lazy dog", "now is the time for all good men to come to the aid of their country", "a man a plan a canal panama")
+dfModel = data.frame(doc_id=doc_ids, text=texts)
+```
+
+```{r}
+model = paragraph2vec(x = dfModel, type = "PV-DBOW", dim = 16, iter = 20, 
+                       min_count = 1, lr = 0.05, threads = 4)
+embedding = as.matrix(model, which = "docs")
+vocab = summary(model, which="docs")
+
+dfResults = NULL
+
+  newText = "I have a quick brown dog who jumped over the fence"
+
+  sentences = list(wordVec=unlist(strsplit(newText, " "))) # split into words
+  
+  z=predict(model, newdata=sentences, type="embedding", which="docs")
+  
+  closeness = c(
+    cosine(as.vector(z), as.vector(embedding[1,])),
+    cosine(as.vector(z), as.vector(embedding[2,])),
+    cosine(as.vector(z), as.vector(embedding[3,]))
+  )
+  
+  maxClose = which(closeness == max(closeness))
+  print(closeness)
+  print(vocab[maxClose])
+```

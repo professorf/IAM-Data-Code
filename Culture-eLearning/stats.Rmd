@@ -1,0 +1,149 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+cond1 = c( # Condition Phases:I-V, Single Post Score
+21.62,
+13.51,
+16.21,
+14.86,
+8.10,
+18.91,
+17.57,
+13.51,
+24.32,
+10.81,
+18.91,
+17.57,
+13.51,
+20.27,
+18.91,
+13.51,
+16.22,
+12.16,
+20.27,
+17.56
+)
+ucond1 = mean(cond1)
+sdcond1 = sd(cond1)
+
+cond2 = c( # PhasesI-V, Multiple Post Score
+24.32,
+28.38,
+22.97,
+24.32,
+20.27,
+31.08,
+20.27,
+22.97,
+21.62,
+17.56,
+12.16,
+16.21,
+17.56,
+22.97,
+27.02,
+25.67,
+21.62,
+18.91,
+12.16,
+22.97
+)
+ucond2=mean(cond2)
+sdcond2 = sd(cond2)
+
+
+
+
+
+cond3 = c( # I-III, Single Post Score
+  32.43,
+  32.43,
+  36.48,
+  35.14,
+  32.43,
+  24.32,
+  31.08,
+  43.24,
+  35.13,
+  31.08,
+  29.73,
+  33.78,
+  25.67,
+  32.43,
+  37.84,
+  39.19,
+  36.49,
+  37.84,
+  39.18,
+  36.49
+)
+ucond3=mean(cond3)
+sdcond3 = sd(cond3)
+
+
+
+
+
+
+cond4 = c( # I-III, Multiple Post Scores
+  37.84,
+  35.13,
+  41.89,
+  33.78,
+  29.73,
+  35.14,
+  31.08,
+  31.08,
+  33.78,
+  33.78,
+  32.43,
+  29.73,
+  33.78,
+  43.24,
+  35.13,
+  31.08,
+  37.84,
+  33.78,
+  39.19,
+  33.78
+)
+ucond4 = mean(cond4)
+sdcond4 = sd(cond4)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+df = data.frame(accuracy = c(cond1, cond2, cond3, cond4), 
+                phsize=as.factor(c(rep("I_V",40), rep("I_III",40))),
+                scoretype=as.factor(c(rep("single",20), rep("multiple",20), rep("single",20), rep("multiple",20))))
+df$phsize = as.factor(df$phsize)
+model = lm (accuracy~phsize + scoretype + phsize*scoretype, df)
+summary(model)                
+
+# t.tests
+t.test(cond2, cond1)
+
+condA=c(cond1, cond2)
+condB=c(cond3, cond4)
+t.test(condB, condA)
+```
+
+
+
+
+

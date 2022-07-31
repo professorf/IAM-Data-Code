@@ -1,0 +1,139 @@
+---
+title: "Doc2Vec Culture & e-Learning Phases I-V"
+output: html_notebook
+---
+
+```{r}
+library(doc2vec)
+library(lsa)
+```
+
+1. Read in data sets and create one giant data set
+```{r}
+dfTrain0 = read.csv("culture-eLearning-1.csv", stringsAsFactors = F, encoding = "UTF-8")
+dfTrain1 = read.csv("culture-eLearning-2.csv", stringsAsFactors = F, encoding = "UTF-8")
+dfTrain2 = read.csv("culture-eLearning-3.csv", stringsAsFactors = F, encoding = "UTF-8")
+dfRaw  = rbind(dfTrain0, dfTrain2)
+```
+
+2. Data Wrangling: Collapses Subphases into Phases
+```{r}
+# Collapse phases
+phase1Cols = 5:9
+phase2Cols = 10:12
+phase3Cols = 13:17
+phase4Cols = 18:22
+phase5Cols = 23:25
+
+phI = c()
+phII = c()
+phIII = c()
+phIV = c()
+phV = c()
+for (i in 1:length(dfRaw$Post))  {
+  phI   = c(phI  , sum(as.numeric(dfRaw[i,phase1Cols])))
+  phII  = c(phII , sum(as.numeric(dfRaw[i,phase2Cols])))
+  phIII = c(phIII, sum(as.numeric(dfRaw[i,phase3Cols])))
+  phIV  = c(phIV , sum(as.numeric(dfRaw[i,phase4Cols])))
+  phV   = c(phV  , sum(as.numeric(dfRaw[i,phase5Cols])))
+}
+  
+dfTrain = data.frame(post=dfRaw$Post, apI= phI, apII=phII, apIII = phIII, apIV = phIV, apV=phV)
+```
+
+3. Generate training dataset
+```{r}
+dfModel = data.frame(NULL)
+
+apCols = c("apV", "apIV", "apIII", "apII", "apI")
+
+uniquePhases=F
+for (i in 1:length(dfTrain$post)) {
+  text = gsub("[^a-zA-Z]", " ", dfTrain$post[i])
+  text = gsub("[ ]{2,}", " ", text)
+  text = tolower(text)
+  if (uniquePhases == F) {
+    for (phColName in apCols) {
+      if (dfTrain[i, phColName]!=0) {
+        doc_id = phColName
+        dfModel = rbind(dfModel, c(doc_id, text))
+      }  
+    }
+  } else {
+    counts = dfTrain[i, apCols]
+    maxCol = which(counts==max(counts))
+    doc_id = apCols[maxCol[1]]
+    dfModel = rbind(dfModel, c(doc_id, text))
+  }
+}
+colnames(dfModel) = c("doc_id", "text")
+
+```
+
+4. Train Model
+```{r}
+model     = paragraph2vec(x = dfModel, type = "PV-DBOW", dim = 64, iter = 20, 
+                       min_count = 5, lr = 0.05, threads = 4)
+embedding = as.matrix(model, which = "docs")
+vocab     = summary(model, which="docs")
+```
+
+5. Test the model accuracy
+```{r}
+dfTest = read.csv("Culture-eLearning-B.csv", stringsAsFactors = F, encoding="UTF-8")
+
+dfResults = NULL
+
+for (i in 1:length(dfTest$post)) {
+  newText = dfTest$post[i]
+  newText = gsub("[^a-zA-Z]", " ", newText)
+  newText = gsub("[ ]{2,}", " ", newText)
+  newText = tolower(newText)
+
+  # This version of doc2vec wants sentences as a list of word vectors  
+  sentences = list(wordVec=unlist(strsplit(newText, " "))) # split into words
+  
+  sentenceEmbedding=predict(model, newdata=sentences, type="embedding", which="docs")
+  
+  # Now find the most similar phase embedding
+  phaseCols = c("phI", "phII", "phIII", "phIV", "phV")
+
+  closeness = c(
+    cosine(as.vector(sentenceEmbedding), as.vector(embedding["apI",])),
+    cosine(as.vector(sentenceEmbedding), as.vector(embedding["apII",])),
+    cosine(as.vector(sentenceEmbedding), as.vector(embedding["apIII",])),
+    cosine(as.vector(sentenceEmbedding), as.vector(embedding["apIV",])),
+    cosine(as.vector(sentenceEmbedding), as.vector(embedding["apV",]))
+  )
+  
+  maxClose = which(closeness == max(closeness))
+
+  resultRow = c(i, closeness, dfTest[i,c("apI","apII", "apIII","apIV", "apV")])
+  dfResults = rbind(dfResults, resultRow)
+}
+dfResults = as.data.frame(dfResults)
+colnames(dfResults) = c("postNum", "predicted-I", "predicted-II", "predicted-III", "predicted-IV", "predicted-V", "actual-I", "actual-II", "actual-III", "actual-IV", "actual-V")
+rownames(dfResults) = NULL
+dfResults = apply(dfResults, 2, as.numeric)
+#
+# Determine correctness
+#
+predictCols = c("predicted-I", "predicted-II", "predicted-III", "predicted-IV", "predicted-V")
+correctCols = c("actual-I", "actual-II", "actual-III", "actual-IV", "actual-V")
+predicts = dfResults[,predictCols]
+bestPredict = max.col(predicts) # I'm assuming no ties
+
+# because of ties bestCorrect cannot use max.col
+corrects = dfResults[,correctCols]
+bestCorrect = c()
+for (i in 1:nrow(corrects)) {
+  maxes = which(corrects[i,]==max(corrects[i,]))
+  maxCol = maxes[length(maxes)]
+  bestCorrect = c(bestCorrect, maxCol)
+}
+correct = ifelse(bestPredict == bestCorrect, "Y", "N")
+dfFinal = data.frame(dfResults,neuralPredict=bestPredict,humanPredict=bestCorrect, correct)
+accuracy = length(which(correct=="Y"))/length(correct)
+write.csv(dfFinal, "model-results-I-V.csv", row.names=F)
+print(accuracy*100)
+```
